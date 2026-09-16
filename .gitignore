@@ -1,0 +1,15 @@
+node_modules/
+client/node_modules/
+server/node_modules/
+client/dist/
+.env
+.env.local
+server/data/*.db
+server/data/*.db-journal
+server/data/*.db-wal
+server/uploads/*
+!server/uploads/.gitkeep
+.DS_Store
+Thumbs.db
+coverage/
+*.log

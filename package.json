@@ -1,0 +1,20 @@
+{
+  "name": "nexusmind-root",
+  "version": "1.0.0",
+  "description": "NexusMind — Next-Gen AI Personal Assistant with Voice, Vision, and Autonomous Memory",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "node --watch server/server.js",
+    "client": "npm --prefix client run dev",
+    "dev": "node scripts/dev.js",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "test:server": "npm --prefix server test",
+    "test:client": "npm --prefix client test",
+    "test": "npm run test:server && npm run test:client",
+    "build": "npm --prefix client run build"
+  },
+  "keywords": ["ai", "assistant", "voice", "mediapipe", "agent", "memory", "sqlite"],
+  "author": "",
+  "license": "MIT"
+}
