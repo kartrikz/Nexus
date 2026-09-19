@@ -61,15 +61,39 @@ class ClaudeProvider extends BaseAIProvider {
           });
         }
       } else if (msg.role === 'tool') {
+        let responseData = {};
+        try {
+          responseData = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+        } catch {
+          responseData = { result: msg.content };
+        }
+
+        const base64Data = responseData.imageBase64;
+        const cleanedData = { ...responseData };
+        delete cleanedData.imageBase64;
+
+        const contentBlocks = [
+          {
+            type: 'tool_result',
+            tool_use_id: msg.tool_call_id,
+            content: typeof cleanedData === 'string' ? cleanedData : JSON.stringify(cleanedData)
+          }
+        ];
+
+        if (base64Data) {
+          contentBlocks.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: base64Data
+            }
+          });
+        }
+
         anthropicMessages.push({
           role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: msg.tool_call_id,
-              content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
-            }
-          ]
+          content: contentBlocks
         });
       }
     }

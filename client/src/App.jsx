@@ -47,6 +47,7 @@ function MainApp() {
   // Load messages when activeId changes
   useEffect(() => {
     if (!activeId || !user) return;
+    if (isGenerating) return;
     const fetchConv = async () => {
       try {
         const data = await api.getConversation(activeId);
@@ -57,7 +58,7 @@ function MainApp() {
       }
     };
     fetchConv();
-  }, [activeId, user]);
+  }, [activeId, user, isGenerating]);
 
   const handleNewConversation = async () => {
     try {
@@ -142,51 +143,84 @@ function MainApp() {
         throw new Error(`HTTP error ${response.status}`);
       }
 
-      // Read SSE stream
+      // Read SSE stream with line buffering
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
       let toolCallsList = [];
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep partial line for next chunk
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6).trim();
-            if (dataStr === '[DONE]') continue;
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+          const dataStr = trimmedLine.slice(6).trim();
+          if (dataStr === '[DONE]') continue;
 
-            try {
-              const event = JSON.parse(dataStr);
-              if (event.type === 'token') {
-                fullContent += event.token;
-                setStreamedText(fullContent);
-              } else if (event.type === 'tool_start') {
-                setCurrentToolStatus({ tool: event.tool, args: event.args });
-              } else if (event.type === 'tool_end') {
-                setCurrentToolStatus(null);
-                toolCallsList.push({ name: event.tool, result: event.result });
-              } else if (event.type === 'message') {
-                setMessages(prev => [
-                  ...prev,
+          try {
+            const event = JSON.parse(dataStr);
+            if (event.type === 'token') {
+              fullContent += event.token;
+              setStreamedText(fullContent);
+            } else if (event.type === 'tool_start') {
+              setCurrentToolStatus({ tool: event.tool, args: event.args });
+            } else if (event.type === 'tool_end') {
+              setCurrentToolStatus(null);
+              toolCallsList.push({ name: event.tool, result: event.result });
+            } else if (event.type === 'message') {
+              setMessages(prev => {
+                const messageId = event.messageId || `asst-${Date.now()}`;
+                const filtered = prev.filter(m => m.id !== messageId && m.id !== 'streaming-temp');
+                return [
+                  ...filtered,
                   {
-                    id: event.messageId || `asst-${Date.now()}`,
+                    id: messageId,
                     role: 'assistant',
                     content: event.content || fullContent,
                     tool_calls: event.tool_calls || toolCallsList,
                     tool_results: event.tool_results,
                     created_at: new Date().toISOString()
                   }
-                ]);
-              }
-            } catch (pErr) {
-              // Non-JSON chunk
+                ];
+              });
             }
+          } catch (pErr) {
+            // Non-JSON chunk
           }
+        }
+      }
+
+      // Check trailing buffer
+      if (buffer && buffer.trim().startsWith('data: ')) {
+        const dataStr = buffer.trim().slice(6).trim();
+        if (dataStr !== '[DONE]') {
+          try {
+            const event = JSON.parse(dataStr);
+            if (event.type === 'message') {
+              setMessages(prev => {
+                const messageId = event.messageId || `asst-${Date.now()}`;
+                const filtered = prev.filter(m => m.id !== messageId && m.id !== 'streaming-temp');
+                return [
+                  ...filtered,
+                  {
+                    id: messageId,
+                    role: 'assistant',
+                    content: event.content || fullContent,
+                    tool_calls: event.tool_calls || toolCallsList,
+                    tool_results: event.tool_results,
+                    created_at: new Date().toISOString()
+                  }
+                ];
+              });
+            }
+          } catch {}
         }
       }
     } catch (err) {

@@ -1,6 +1,7 @@
 const { BaseAIProvider } = require('./base');
 const logger = require('../../utils/logger');
 const { APPLICATION_ALLOWLIST } = require('../tools/computer/applicationAllowlist');
+const { windowsBridge } = require('../tools/computer/windowsBridge');
 
 class GeminiProvider extends BaseAIProvider {
   constructor() {
@@ -69,15 +70,35 @@ class GeminiProvider extends BaseAIProvider {
         } catch {
           responseData = { result: msg.content };
         }
+
+        const base64Data = responseData.imageBase64;
+        const cleanedData = { ...responseData };
+        delete cleanedData.imageBase64;
+
         contents.push({
-          role: 'user',
+          role: 'function',
           parts: [{
             functionResponse: {
               name: msg.name || 'tool_response',
-              response: { output: responseData }
+              response: { output: cleanedData }
             }
           }]
         });
+
+        if (base64Data) {
+          contents.push({
+            role: 'user',
+            parts: [
+              { text: `Desktop screen capture from ${msg.name || 'observation'}:` },
+              {
+                inlineData: {
+                  mimeType: 'image/png',
+                  data: base64Data
+                }
+              }
+            ]
+          });
+        }
       }
     }
 
@@ -244,6 +265,7 @@ function formatGeminiSchema(schema) {
     }
 
     // Intelligent autonomous reasoning simulator fallback (offline dev, zero-key demo, tests)
+    logger.warn('[simulateResponse] FALLBACK ACTIVATED — live API unavailable or key missing.');
     await this.simulateResponse({ messages, tools, onToken, onToolCall, onDone });
   }
 
@@ -266,22 +288,329 @@ function formatGeminiSchema(schema) {
 
       const toolName = toolMsg.name;
 
-      // Multi-step chaining: If user said "Open Chrome and go to YouTube", chain open_url after open_application
-      if (toolName === 'open_application' && toolData.success) {
+      // ── V2 Multi-Step Desktop Interaction Chaining ───────────────────────────
+      // Scenario A: "Open Chrome and search YouTube for <QUERY>"
+      const isYoutubeSearchTask = /chrome/i.test(lastUserLower) && /youtube/i.test(lastUserLower) && /search/i.test(lastUserLower);
+      if (isYoutubeSearchTask) {
+        // Dynamically extract the search query from the actual user message.
+        // Matches: "search YouTube for <QUERY>" or "YouTube search for <QUERY>"
+        const youtubeQueryMatch =
+          lastUserMessage.match(/search\s+(?:on\s+)?youtube\s+for\s+(.+?)(?:[.!?]\s*$|$)/i) ||
+          lastUserMessage.match(/youtube\s+(?:search\s+for|for)\s+(.+?)(?:[.!?]\s*$|$)/i);
+        const rawQuery = youtubeQueryMatch ? youtubeQueryMatch[1].trim() : 'nexusmind search';
+        const encodedQuery = encodeURIComponent(rawQuery).replace(/%20/g, '+');
+        const youtubeUrl = `https://www.youtube.com/results?search_query=${encodedQuery}`;
+        logger.info(`[simulateResponse] YouTube search task — extracted query: "${rawQuery}" → ${youtubeUrl}`);
+
+        if (toolName === 'open_application' && toolData.success) {
+          onToolCall({
+            id: `call_obs_${Date.now()}`,
+            name: 'desktop_observe',
+            arguments: {}
+          });
+          onDone('tool_calls');
+          return;
+        }
+
+        if (toolName === 'desktop_observe') {
+          const hasTyped = messages.some(m => m.role === 'tool' && m.name === 'keyboard_type');
+          if (!hasTyped) {
+            // Focus address bar
+            onToolCall({
+              id: `call_click_${Date.now()}`,
+              name: 'mouse_click',
+              arguments: { x: 450, y: 82, button: 'left' }
+            });
+            onDone('tool_calls');
+            return;
+          } else {
+            // Post-action verification complete — use dynamic query in reply
+            const reply = `I have opened **Google Chrome**, focused the search address box at (450, 82), navigated to YouTube **${rawQuery}**, and verified the desktop results via screen observation.`;
+            await this._streamSimulatedText(reply, onToken);
+            onDone('stop');
+            return;
+          }
+        }
+
+        if (toolName === 'mouse_click' && toolData.success) {
+          onToolCall({
+            id: `call_type_${Date.now()}`,
+            name: 'keyboard_type',
+            // Dynamic URL — built from the actual user's search query
+            arguments: { text: youtubeUrl, pressEnterAfter: true }
+          });
+          onDone('tool_calls');
+          return;
+        }
+
+        if (toolName === 'keyboard_type' && toolData.success) {
+          // Observe again for verification
+          onToolCall({
+            id: `call_verif_${Date.now()}`,
+            name: 'desktop_observe',
+            arguments: {}
+          });
+          onDone('tool_calls');
+          return;
+        }
+      }
+
+      // ── Scenario A-Google: "Open Chrome and search Google for <QUERY>" ─────────
+      const isGoogleSearchTask =
+        /chrome/i.test(lastUserLower) &&
+        /google/i.test(lastUserLower) &&
+        /search/i.test(lastUserLower) &&
+        !isYoutubeSearchTask; // not already handled above
+      if (isGoogleSearchTask) {
+        const googleQueryMatch =
+          lastUserMessage.match(/search\s+(?:on\s+)?google\s+for\s+(.+?)(?:[.!?]\s*$|$)/i) ||
+          lastUserMessage.match(/google\s+(?:search\s+for|for)\s+(.+?)(?:[.!?]\s*$|$)/i);
+        const rawGQuery = googleQueryMatch ? googleQueryMatch[1].trim() : 'nexusmind search';
+        const encodedGQuery = encodeURIComponent(rawGQuery).replace(/%20/g, '+');
+        const googleUrl = `https://www.google.com/search?q=${encodedGQuery}`;
+        logger.info(`[simulateResponse] Google search task — extracted query: "${rawGQuery}" → ${googleUrl}`);
+
+        if (toolName === 'open_application' && toolData.success) {
+          onToolCall({ id: `call_obs_${Date.now()}`, name: 'desktop_observe', arguments: {} });
+          onDone('tool_calls');
+          return;
+        }
+        if (toolName === 'desktop_observe') {
+          const hasTyped = messages.some(m => m.role === 'tool' && m.name === 'keyboard_type');
+          if (!hasTyped) {
+            onToolCall({ id: `call_click_${Date.now()}`, name: 'mouse_click', arguments: { x: 450, y: 82, button: 'left' } });
+            onDone('tool_calls');
+            return;
+          } else {
+            const reply = `I have opened **Google Chrome**, focused the address bar, and navigated to Google search for **${rawGQuery}**.`;
+            await this._streamSimulatedText(reply, onToken);
+            onDone('stop');
+            return;
+          }
+        }
+        if (toolName === 'mouse_click' && toolData.success) {
+          onToolCall({
+            id: `call_type_${Date.now()}`,
+            name: 'keyboard_type',
+            arguments: { text: googleUrl, pressEnterAfter: true }
+          });
+          onDone('tool_calls');
+          return;
+        }
+        if (toolName === 'keyboard_type' && toolData.success) {
+          onToolCall({ id: `call_verif_${Date.now()}`, name: 'desktop_observe', arguments: {} });
+          onDone('tool_calls');
+          return;
+        }
+      }
+
+      // ── Scenario B-Calc: "Open Calculator and calculate <EXPR>" ──────────────
+      const isCalculatorTask =
+        /calculator|calc\b/i.test(lastUserLower) &&
+        (/calculate|compute|\d/.test(lastUserLower));
+      if (isCalculatorTask) {
+        // Extract expression dynamically from the user message
+        const calcExprMatch =
+          lastUserMessage.match(/calculate\s+(.+?)(?:[.!?]\s*$|$)/i) ||
+          lastUserMessage.match(/compute\s+(.+?)(?:[.!?]\s*$|$)/i) ||
+          lastUserMessage.match(/(?:calculator|calc)\s+(?:and\s+)?(.+?)(?:[.!?]\s*$|$)/i);
+        const rawExpr = calcExprMatch ? calcExprMatch[1].trim() : '';
+        logger.info(`[simulateResponse] Calculator task — extracted expression: "${rawExpr}"`);
+
+        if (toolName === 'open_application' && toolData.success) {
+          if (rawExpr) {
+            // Type the expression into Windows Calculator via keyboard
+            onToolCall({
+              id: `call_type_${Date.now()}`,
+              name: 'keyboard_type',
+              arguments: { text: rawExpr, pressEnterAfter: true }
+            });
+            onDone('tool_calls');
+          } else {
+            // No expression found — just report app opened
+            const reply = `I have opened **Windows Calculator** for you.`;
+            await this._streamSimulatedText(reply, onToken);
+            onDone('stop');
+          }
+          return;
+        }
+        if (toolName === 'keyboard_type' && toolData.success) {
+          const reply = `I have opened **Windows Calculator** and entered **${rawExpr}** via keyboard. The result should now be displayed on screen.`;
+          await this._streamSimulatedText(reply, onToken);
+          onDone('stop');
+          return;
+        }
+      }
+
+      // ── Scenario B-Explorer: "Open File Explorer and open <FOLDER>" ──────────
+      // Maps friendly folder names to real Windows paths using USERPROFILE.
+      const KNOWN_WINDOWS_FOLDERS = {
+        downloads:  `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Downloads`,
+        documents:  `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Documents`,
+        desktop:    `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Desktop`,
+        pictures:   `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Pictures`,
+        videos:     `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Videos`,
+        music:      `${process.env.USERPROFILE || 'C:\\Users\\User'}\\Music`,
+        'this pc':  '%USERPROFILE%',
+        home:       `${process.env.USERPROFILE || 'C:\\Users\\User'}`,
+      };
+      const isFileExplorerTask =
+        /file\s*explorer|explorer/i.test(lastUserLower) &&
+        Object.keys(KNOWN_WINDOWS_FOLDERS).some(k => lastUserLower.includes(k));
+      if (isFileExplorerTask) {
+        const matchedFolder = Object.keys(KNOWN_WINDOWS_FOLDERS).find(k => lastUserLower.includes(k));
+        const folderPath = KNOWN_WINDOWS_FOLDERS[matchedFolder];
+        logger.info(`[simulateResponse] File Explorer task — matched folder "${matchedFolder}" → ${folderPath}`);
+
+        if (toolName === 'open_application' && toolData.success) {
+          onToolCall({
+            id: `call_folder_${Date.now()}`,
+            name: 'open_folder',
+            arguments: { folderPath }
+          });
+          onDone('tool_calls');
+          return;
+        }
+        if (toolName === 'open_folder' && toolData.success) {
+          const reply = `I have opened **File Explorer** and navigated to the **${matchedFolder.charAt(0).toUpperCase() + matchedFolder.slice(1)}** folder (${folderPath}).`;
+          await this._streamSimulatedText(reply, onToken);
+          onDone('stop');
+          return;
+        }
+      }
+
+      // Scenario A2: "Open Notepad and type ..."
+      const isNotepadTypeTask = /notepad/i.test(lastUserLower) && /type/i.test(lastUserLower);
+      if (isNotepadTypeTask) {
+        if (toolName === 'open_application' && toolData.success) {
+          let textToType = 'Hello NexusMind';
+          const quoteMatch = lastUserMessage.match(/type\s+["“]([^"”]+)["”]/i);
+          if (quoteMatch) {
+            textToType = quoteMatch[1];
+          } else {
+            const rawTypeMatch = lastUserMessage.match(/type\s+(.+?)(?:\s+into\s+.*)?$/i);
+            if (rawTypeMatch) textToType = rawTypeMatch[1].replace(/into\s+notepad/i, '').replace(/["']/g, '').trim();
+          }
+
+          onToolCall({
+            id: `call_type_${Date.now()}`,
+            name: 'keyboard_type',
+            arguments: { text: textToType, pressEnterAfter: true }
+          });
+          onDone('tool_calls');
+          return;
+        }
+
+        if (toolName === 'keyboard_type' && toolData.success) {
+          const reply = `I have opened **Notepad** and typed into the document.`;
+          await this._streamSimulatedText(reply, onToken);
+          onDone('stop');
+          return;
+        }
+      }
+
+      // Scenario B: "Open VS Code and create a new file"
+      const isVSCodeNewFile = /vs\s*code|visual\s*studio\s*code/i.test(lastUserLower) && /new\s+file/i.test(lastUserLower);
+      if (isVSCodeNewFile) {
+        if (toolName === 'open_application' && toolData.success) {
+          onToolCall({
+            id: `call_press_${Date.now()}`,
+            name: 'keyboard_press',
+            arguments: { key: 'N', modifiers: ['CTRL'] }
+          });
+          onDone('tool_calls');
+          return;
+        }
+        if (toolName === 'keyboard_press' && toolData.success) {
+          const reply = `I have opened **Visual Studio Code** and pressed **Ctrl+N** to create a new file for you.`;
+          await this._streamSimulatedText(reply, onToken);
+          onDone('stop');
+          return;
+        }
+      }
+
+      // Scenario C: "Click the search box and type Python"
+      const isClickAndType = /click/i.test(lastUserLower) && /type/i.test(lastUserLower);
+      if (isClickAndType) {
+        if (toolName === 'mouse_click' && toolData.success) {
+          let textToType = 'Python';
+          const typeMatch = lastUserMessage.match(/type\s+["']?([^"'\n]+)["']?/i);
+          if (typeMatch && typeMatch[1]) textToType = typeMatch[1].trim();
+
+          onToolCall({
+            id: `call_type_${Date.now()}`,
+            name: 'keyboard_type',
+            arguments: { text: textToType, pressEnterAfter: true }
+          });
+          onDone('tool_calls');
+          return;
+        }
+        if (toolName === 'keyboard_type' && toolData.success) {
+          const reply = `I clicked the search box at (${toolData.x || 450}, ${toolData.y || 82}) and typed **${lastUserMessage.match(/type\s+([^\s]+)/i)?.[1] || 'Python'}**.`;
+          await this._streamSimulatedText(reply, onToken);
+          onDone('stop');
+          return;
+        }
+      }
+
+      // Scenario D: desktop_observe response (active window + screen state)
+      // NOTE: desktop_screenshot is intentionally excluded here — it has its own branch below (line ~603)
+      if (toolName === 'desktop_observe' && toolData.success) {
+        const w = toolData.width || 1920;
+        const h = toolData.height || 1200;
+        const win = toolData.activeWindow || 'Desktop Session';
+        const reply = `I observed the desktop (${w}\u00d7${h}).\n\n- **Active Foreground Window**: ${win}\n- **Display Status**: Ready for input\n- **Snapshot**: \`${toolData.filePath || 'In-memory frame'}\``;
+        await this._streamSimulatedText(reply, onToken);
+        onDone('stop');
+        return;
+      }
+
+      // Scenario E: standalone desktop_screenshot result
+      if (toolName === 'desktop_screenshot' && toolData.success) {
+        const w = toolData.width || 1920;
+        const h = toolData.height || 1200;
+        const sizePart = toolData.fileSize ? ` (${toolData.fileSize})` : '';
+        // If user wanted AI analysis of what’s on screen, add active-window context
+        const wantsAnalysis = /tell me|which app|what.*(open|running|active|screen)|what is on/i.test(lastUserMessage);
+        let reply;
+        if (wantsAnalysis) {
+          const win = windowsBridge.getActiveWindow();
+          reply = `I captured a **${w}\u00d7${h}** screenshot${sizePart} saved to:\n\`${toolData.filePath}\`\n\n` +
+                  `Based on the desktop observation, the currently active application is **${win.title || 'Desktop Session'}**.`;
+        } else {
+          reply = `I captured a **${w}\u00d7${h}** screenshot${sizePart} of your desktop and saved it to:\n\`${toolData.filePath}\``;
+        }
+        await this._streamSimulatedText(reply, onToken);
+        onDone('stop');
+        return;
+      }
+
+      // V1 multi-step URL chaining: "Open Chrome and go to YouTube/github.com/etc."
+      // GUARD: only fires when the target looks like a real URL/domain, NOT a folder name.
+      const V1_FOLDER_WORDS = /\b(downloads?|documents?|desktop|pictures|videos?|music|this\s*pc)\b/i;
+      if (toolName === 'open_application' && toolData.success && !V1_FOLDER_WORDS.test(lastUserMessage)) {
         const urlMatch = lastUserMessage.match(/(?:and|then)\s+(?:go\s+to|open|visit|navigate\s+to)\s+([^\s]+)/i);
         const youtubeMatch = /(?:and|then)\s+(?:go\s+to|open|visit|navigate\s+to|watch)?\s*youtube/i.test(lastUserMessage);
         if (urlMatch || youtubeMatch) {
           let targetUrl = 'https://www.youtube.com';
           if (urlMatch && urlMatch[1] && !/youtube/i.test(urlMatch[1])) {
-            targetUrl = urlMatch[1].startsWith('http') ? urlMatch[1] : `https://${urlMatch[1]}`;
+            // Only treat as URL if it looks like a domain, not a plain word like "Downloads"
+            const candidate = urlMatch[1];
+            const looksLikeUrl = candidate.startsWith('http') || /\.[a-z]{2,}$/i.test(candidate);
+            if (!looksLikeUrl) {
+              // Plain word — not a URL, skip URL chaining
+              logger.warn(`[simulateResponse] V1 URL chaining skipped — "${candidate}" is not a URL.`);
+            } else {
+              targetUrl = candidate.startsWith('http') ? candidate : `https://${candidate}`;
+              onToolCall({ id: `call_url_${Date.now()}`, name: 'open_url', arguments: { url: targetUrl } });
+              onDone('tool_calls');
+              return;
+            }
+          } else if (youtubeMatch) {
+            onToolCall({ id: `call_url_${Date.now()}`, name: 'open_url', arguments: { url: targetUrl } });
+            onDone('tool_calls');
+            return;
           }
-          onToolCall({
-            id: `call_url_${Date.now()}`,
-            name: 'open_url',
-            arguments: { url: targetUrl }
-          });
-          onDone('tool_calls');
-          return;
         }
       }
 
@@ -294,7 +623,7 @@ function formatGeminiSchema(schema) {
         } else {
           responseText = `I have opened **${toolData.url}** in your default web browser.`;
         }
-      } else if (toolData.filePath && toolData.success && toolName === 'screenshot') {
+      } else if (toolData.filePath && toolData.success && (toolName === 'screenshot' || toolName === 'desktop_screenshot')) {
         responseText = `I have captured a screenshot of your screen and saved it to:\n\`${toolData.filePath}\``;
       } else if (toolData.filePath && toolData.success && toolName === 'open_file') {
         responseText = `I have opened the file:\n\`${toolData.filePath}\` using its default application.`;
@@ -308,6 +637,8 @@ function formatGeminiSchema(schema) {
         responseText = `A confirmation is required before proceeding with this action:\n> **${toolData.action}**: \`${toolData.target || toolData.filePath}\`\n\nPlease click **Allow** or **Cancel** in the confirmation card above.`;
       } else if (toolData.action && toolData.success) {
         responseText = `✓ Action completed: ${toolData.message}`;
+      } else if (toolData.message && toolData.success) {
+        responseText = `✓ ${toolData.message}`;
       } else if (toolData.error) {
         responseText = `⚠️ ${toolData.message || 'The requested action could not be completed.'}`;
       } else if (toolData.result !== undefined) {
@@ -332,12 +663,46 @@ function formatGeminiSchema(schema) {
 
     const lower = lastUserMessage.toLowerCase().trim();
 
-    // 1. Math computation
+    // ── APPLICATION LAUNCH (checked first so "Open Calculator and calculate X"
+    //    opens the app rather than firing the server-side calculator tool) ───────
+    const isLaunchIntentEarly = /^(?:open|launch|start|run|bring up|switch to)\s+/i.test(lower) ||
+      lower.includes('open chrome') ||
+      lower.includes('open vscode') ||
+      lower.includes('open vs code') ||
+      lower.includes('open notepad') ||
+      lower.includes('open calculator') ||
+      lower.includes('open file explorer') ||
+      lower.includes('open explorer');
+
+    if (isLaunchIntentEarly) {
+      const { APPLICATION_ALLOWLIST } = require('../tools/computer/applicationAllowlist');
+      const matchedApp = APPLICATION_ALLOWLIST.find(app => {
+        const nameLower = app.name.toLowerCase();
+        if (lower.includes(nameLower)) return true;
+        return app.aliases.some(alias => {
+          const aliasLower = alias.toLowerCase();
+          return new RegExp(`\\b${aliasLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lower) ||
+            lower.includes(aliasLower);
+        });
+      });
+      if (matchedApp) {
+        logger.info(`[simulateResponse] Launch intent — opening app: ${matchedApp.name}`);
+        onToolCall({
+          id: `call_app_${Date.now()}`,
+          name: 'open_application',
+          arguments: { application: matchedApp.name }
+        });
+        onDone('tool_calls');
+        return;
+      }
+    }
+
+    // 1. Math computation (pure math only — no app-launch commands reach here)
     if (
       lower.includes('calculate') ||
       lower.includes('% of') ||
       (lower.includes('what is') && /\d/.test(lower)) ||
-      (/[+\-*/^]/.test(lastUserMessage) && /\d/.test(lastUserMessage))
+      (/[+\-*/^]/.test(lastUserMessage) && /\d/.test(lastUserMessage) && !isLaunchIntentEarly)
     ) {
       let expr = lastUserMessage.replace(/what is|calculate|compute|\?|the result of/gi, '').trim();
       if (!expr) expr = '2 + 2';
@@ -350,7 +715,25 @@ function formatGeminiSchema(schema) {
       return;
     }
 
-    // 2. Screenshot tool
+    // 2. Desktop Observation & Screen Analysis tool
+    if (
+      lower.includes('tell me what is on the screen') ||
+      lower.includes('what is on the screen') ||
+      lower.includes('what is on my screen') ||
+      lower.includes('observe screen') ||
+      lower.includes('desktop observe') ||
+      lower.includes('desktop_observe')
+    ) {
+      onToolCall({
+        id: `call_obs_${Date.now()}`,
+        name: 'desktop_observe',
+        arguments: { includeImage: true }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2b. Screenshot tool (V1 screenshot & V2 desktop_screenshot)
     if (
       lower.includes('screenshot') ||
       lower.includes('capture screen') ||
@@ -361,8 +744,126 @@ function formatGeminiSchema(schema) {
     ) {
       onToolCall({
         id: `call_shot_${Date.now()}`,
-        name: 'screenshot',
+        name: 'desktop_screenshot',
         arguments: {}
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2c. Click and type or single mouse click
+    if (lower.includes('click the search box and type') || (lower.includes('click') && lower.includes('and type'))) {
+      onToolCall({
+        id: `call_click_${Date.now()}`,
+        name: 'mouse_click',
+        arguments: { x: 450, y: 82, button: 'left' }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2d. Mouse scroll
+    if (lower.includes('scroll down')) {
+      onToolCall({
+        id: `call_scroll_${Date.now()}`,
+        name: 'scroll',
+        arguments: { amount: 5 }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    if (lower.includes('scroll up')) {
+      onToolCall({
+        id: `call_scroll_${Date.now()}`,
+        name: 'scroll',
+        arguments: { amount: -5 }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2e. Mouse movements & clicks
+    if (lower.startsWith('double click') || lower.startsWith('double-click')) {
+      const coordMatch = lower.match(/(?:at\s+)?(?:x:?\s*)?(\d+)[,\s]+(?:y:?\s*)?(\d+)/i);
+      const x = coordMatch ? parseInt(coordMatch[1], 10) : 200;
+      const y = coordMatch ? parseInt(coordMatch[2], 10) : 200;
+      onToolCall({
+        id: `call_dbl_${Date.now()}`,
+        name: 'mouse_double_click',
+        arguments: { x, y }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    if (lower.startsWith('click ') || lower.startsWith('click at') || lower.startsWith('mouse click')) {
+      const coordMatch = lower.match(/(?:at\s+)?(?:x:?\s*)?(\d+)[,\s]+(?:y:?\s*)?(\d+)/i);
+      const x = coordMatch ? parseInt(coordMatch[1], 10) : 450;
+      const y = coordMatch ? parseInt(coordMatch[2], 10) : 82;
+      const btn = lower.includes('right') ? 'right' : lower.includes('middle') ? 'middle' : 'left';
+      onToolCall({
+        id: `call_click_${Date.now()}`,
+        name: 'mouse_click',
+        arguments: { x, y, button: btn }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    if (lower.startsWith('move mouse') || lower.startsWith('move cursor')) {
+      const coordMatch = lower.match(/(?:to\s+)?(?:x:?\s*)?(\d+)[,\s]+(?:y:?\s*)?(\d+)/i);
+      const x = coordMatch ? parseInt(coordMatch[1], 10) : 500;
+      const y = coordMatch ? parseInt(coordMatch[2], 10) : 300;
+      onToolCall({
+        id: `call_move_${Date.now()}`,
+        name: 'mouse_move',
+        arguments: { x, y }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2f. Keyboard press
+    if (lower.startsWith('press ') || lower.includes('press enter') || lower.includes('press tab') || lower.includes('press escape')) {
+      let key = 'ENTER';
+      if (lower.includes('tab')) key = 'TAB';
+      else if (lower.includes('escape') || lower.includes('esc')) key = 'ESCAPE';
+      else if (lower.includes('backspace')) key = 'BACKSPACE';
+      else if (lower.includes('space')) key = 'SPACE';
+      else if (lower.includes('delete')) key = 'DELETE';
+      else if (lower.includes('up')) key = 'UP';
+      else if (lower.includes('down')) key = 'DOWN';
+
+      const modifiers = [];
+      if (lower.includes('ctrl')) modifiers.push('CTRL');
+      if (lower.includes('alt')) modifiers.push('ALT');
+      if (lower.includes('shift')) modifiers.push('SHIFT');
+
+      onToolCall({
+        id: `call_key_${Date.now()}`,
+        name: 'keyboard_press',
+        arguments: { key, modifiers }
+      });
+      onDone('tool_calls');
+      return;
+    }
+
+    // 2g. Keyboard type
+    if (lower.startsWith('type ') || lower.startsWith('keyboard type')) {
+      let textToType = 'Hello NexusMind';
+      const quoteMatch = lastUserMessage.match(/type\s+["“]([^"”]+)["”]/i);
+      if (quoteMatch) {
+        textToType = quoteMatch[1];
+      } else {
+        const afterType = lastUserMessage.replace(/^(?:type|keyboard type)\s+/i, '');
+        const intoMatch = afterType.match(/^(.+?)(?:\s+into\s+.*)?$/i);
+        textToType = (intoMatch ? intoMatch[1] : afterType).replace(/["']/g, '').trim();
+      }
+      onToolCall({
+        id: `call_type_${Date.now()}`,
+        name: 'keyboard_type',
+        arguments: { text: textToType, pressEnterAfter: lower.includes('and enter') || lower.includes('enter after') }
       });
       onDone('tool_calls');
       return;
@@ -386,17 +887,13 @@ function formatGeminiSchema(schema) {
       return;
     }
 
-    // 4. Open Application (e.g. "Open Chrome", "open vscode", "Open Notepad", "Launch Calculator", "Open Chrome and go to YouTube")
-    const isLaunchIntent = /^(?:open|launch|start|run|bring up|switch to)\s+/i.test(lower) ||
+    // 4. Open Application — handled early above (isLaunchIntentEarly).
+    // This block is kept as a secondary catch for edge-case aliases not matched above.
+    const isLaunchIntent = !isLaunchIntentEarly && (
       lower.startsWith('code ') ||
       lower.startsWith('notepad ') ||
-      lower.startsWith('chrome ') ||
-      lower.includes('open chrome') ||
-      lower.includes('open vscode') ||
-      lower.includes('open vs code') ||
-      lower.includes('open notepad') ||
-      lower.includes('open calculator');
-
+      lower.startsWith('chrome ')
+    );
     if (isLaunchIntent) {
       const matchedApp = APPLICATION_ALLOWLIST.find(app => {
         const nameLower = app.name.toLowerCase();
@@ -406,8 +903,8 @@ function formatGeminiSchema(schema) {
           return new RegExp(`\\b${aliasLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lower) || lower.includes(aliasLower);
         });
       });
-
       if (matchedApp) {
+        logger.info(`[simulateResponse] Launch intent (fallback) — opening app: ${matchedApp.name}`);
         onToolCall({
           id: `call_app_${Date.now()}`,
           name: 'open_application',

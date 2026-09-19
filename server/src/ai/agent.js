@@ -5,7 +5,7 @@ const { getProvider, geminiProvider } = require('./providers');
 const { buildSystemPrompt } = require('./systemPrompt');
 const logger = require('../utils/logger');
 
-const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOOL_ITERATIONS = 12;
 
 class Agent {
   constructor(provider = null, registry = toolRegistry) {
@@ -151,6 +151,16 @@ class Agent {
 
           onEvent({ type: 'tool_end', tool: tc.name, result });
 
+          // Settle delay for desktop input actions to allow window repainting and navigation
+          const isDesktopAction = ['mouse_click', 'mouse_double_click', 'keyboard_type', 'keyboard_press'].includes(tc.name);
+          if (tc.name === 'open_application') {
+            await new Promise(r => setTimeout(r, 700));
+          } else if (tc.name === 'keyboard_type' && tc.arguments?.pressEnterAfter) {
+            await new Promise(r => setTimeout(r, 600));
+          } else if (isDesktopAction) {
+            await new Promise(r => setTimeout(r, 150));
+          }
+
           // Append tool execution result for the next iteration
           messages.push({
             role: 'tool',
@@ -159,6 +169,20 @@ class Agent {
             content: JSON.stringify(result)
           });
         }
+
+        // Loop safety: prevent oscillation or repeated identical calls (3 in a row)
+        if (executedToolCalls.length >= 3) {
+          const last3 = executedToolCalls.slice(-3);
+          const isIdentical = last3.every(
+            call => call.name === last3[0].name && JSON.stringify(call.args) === JSON.stringify(last3[0].args)
+          );
+          if (isIdentical) {
+            logger.warn(`Loop protection triggered: 3 identical calls to "${last3[0].name}". Breaking iteration loop.`);
+            finalAssistantText = `I paused desktop automation because the action "${last3[0].name}" was requested repeatedly without interface state changes. Please review the current window state.`;
+            break;
+          }
+        }
+
         // Continue next loop iteration to formulate answer based on tool outputs
         continue;
       } else {

@@ -84,7 +84,8 @@ const openApplicationTool = {
           });
         } else {
           // Regular .exe launch
-          child = spawn(resolution.execPath, [], {
+          const execArgs = Array.isArray(resolution.defaultArgs) ? resolution.defaultArgs : [];
+          child = spawn(resolution.execPath, execArgs, {
             detached: true,
             stdio: 'ignore',
             windowsHide: false

@@ -10,6 +10,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { checkToolPermission } = require('./computerPermissions');
+const logger = require('../../../utils/logger');
 
 const screenshotTool = {
   name: 'screenshot',
@@ -22,9 +23,11 @@ const screenshotTool = {
   },
 
   execute: async () => {
+    logger.info('[SCREENSHOT] screenshot (V1): request received');
     // ── Permission check ───────────────────────────────────────────
     const perm = checkToolPermission('screenshot');
     if (!perm.allowed) {
+      logger.warn(`[SCREENSHOT] Permission denied: ${perm.reason}`);
       return { error: true, message: perm.reason };
     }
 
@@ -33,6 +36,7 @@ const screenshotTool = {
     const fileName = `nexusmind_screenshot_${timestamp}.png`;
     const outputDir = path.join(os.tmpdir(), 'nexusmind_screenshots');
     const outputPath = path.join(outputDir, fileName);
+    logger.info(`[SCREENSHOT] image path: ${outputPath}`);
 
     // Ensure directory exists
     try {
@@ -79,6 +83,7 @@ try {
 `.trim();
 
     try {
+      logger.info('[SCREENSHOT] bridge execution started (V1 PowerShell)');
       const result = execSync(
         `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"').replace(/\n/g, '; ')}"`,
         {
@@ -87,10 +92,13 @@ try {
           windowsHide: true
         }
       );
+      logger.info(`[SCREENSHOT] bridge exit code: 0 (stdout: ${String(result).trim().slice(0, 50)})`);
 
       // Verify the file was created
       if (fs.existsSync(outputPath)) {
         const stats = fs.statSync(outputPath);
+        logger.info(`[SCREENSHOT] output size: ${stats.size} bytes`);
+        logger.info(`[SCREENSHOT] result returned to agent: filePath=${outputPath}`);
         return {
           success: true,
           filePath: outputPath,
@@ -99,12 +107,14 @@ try {
           message: `Screenshot captured and saved to ${outputPath}`
         };
       } else {
+        logger.error('[SCREENSHOT] ERROR: file not found after PowerShell exited with OK');
         return {
           error: true,
           message: 'Screenshot command completed but the output file was not found.'
         };
       }
     } catch (err) {
+      logger.error(`[SCREENSHOT] ERROR: ${err.message}`);
       return {
         error: true,
         message: `Failed to capture screenshot: ${err.message}`

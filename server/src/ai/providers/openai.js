@@ -16,6 +16,52 @@ class OpenAIProvider extends BaseAIProvider {
   }
 
   /**
+   * Format standard OpenAI-style messages & tools into an OpenAI API payload,
+   * converting tool image outputs into user image_url parts.
+   */
+  _formatOpenAIPayload(messages, tools = [], temperature = 0.7, model = this.defaultModel) {
+    const formattedMessages = [];
+    for (const msg of messages) {
+      if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.includes('imageBase64')) {
+        let parsed = {};
+        try { parsed = JSON.parse(msg.content); } catch {}
+        if (parsed.imageBase64) {
+          const base64Data = parsed.imageBase64;
+          const cleaned = { ...parsed };
+          delete cleaned.imageBase64;
+          formattedMessages.push({
+            ...msg,
+            content: JSON.stringify(cleaned)
+          });
+          formattedMessages.push({
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Desktop screen capture observation:' },
+              { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Data}` } }
+            ]
+          });
+          continue;
+        }
+      }
+      formattedMessages.push(msg);
+    }
+
+    const body = {
+      model,
+      messages: formattedMessages,
+      temperature,
+      stream: true
+    };
+
+    if (tools && tools.length > 0) {
+      body.tools = tools;
+      body.tool_choice = 'auto';
+    }
+
+    return body;
+  }
+
+  /**
    * Stream a chat completion.
    * Calls onToken(chunkText), onToolCall(toolCallObj), and onDone(finishReason).
    */
@@ -33,17 +79,7 @@ class OpenAIProvider extends BaseAIProvider {
     // Live OpenAI API call if key is set
     if (this.apiKey && this.apiKey.startsWith('sk-')) {
       try {
-        const body = {
-          model: activeModel,
-          messages,
-          temperature,
-          stream: true
-        };
-
-        if (tools && tools.length > 0) {
-          body.tools = tools;
-          body.tool_choice = 'auto';
-        }
+        const body = this._formatOpenAIPayload(messages, tools, temperature, activeModel);
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',

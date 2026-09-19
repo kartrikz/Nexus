@@ -7,6 +7,9 @@ client/dist/
 server/data/*.db
 server/data/*.db-journal
 server/data/*.db-wal
+server/tests/*.db
+server/tests/*.db-shm
+server/tests/*.db-wal
 server/uploads/*
 !server/uploads/.gitkeep
 .DS_Store

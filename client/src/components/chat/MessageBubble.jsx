@@ -12,6 +12,14 @@ const COMPUTER_TOOL_NAMES = [
   'open_file',
   'open_folder',
   'screenshot',
+  'desktop_screenshot',
+  'desktop_observe',
+  'mouse_move',
+  'mouse_click',
+  'mouse_double_click',
+  'keyboard_type',
+  'keyboard_press',
+  'scroll',
   'list_allowed_applications',
   'delete_file',
   'move_file',
@@ -74,8 +82,32 @@ export default function MessageBubble({ message, onSendMessage }) {
     if (tool === 'open_folder') {
       return `Opening folder ${args.folderPath || ''}...`;
     }
-    if (tool === 'screenshot') {
+    if (tool === 'screenshot' || tool === 'desktop_screenshot') {
       return 'Capturing desktop screenshot...';
+    }
+    if (tool === 'desktop_observe') {
+      return 'Observing desktop visual state...';
+    }
+    if (tool === 'mouse_move') {
+      return `Moving mouse to (${args.x}, ${args.y})...`;
+    }
+    if (tool === 'mouse_click') {
+      return `Clicking ${args.button || 'left'} mouse button at (${args.x}, ${args.y})...`;
+    }
+    if (tool === 'mouse_double_click') {
+      return `Double-clicking at (${args.x}, ${args.y})...`;
+    }
+    if (tool === 'keyboard_type') {
+      const preview = args.text?.length > 25 ? `${args.text.slice(0, 25)}...` : args.text;
+      return `Typing "${preview || ''}"...`;
+    }
+    if (tool === 'keyboard_press') {
+      const mods = args.modifiers?.length ? `${args.modifiers.join('+')}+` : '';
+      return `Pressing key [${mods}${args.key || ''}]...`;
+    }
+    if (tool === 'scroll') {
+      const dir = (args.amount || 0) >= 0 ? 'down' : 'up';
+      return `Scrolling ${dir} by ${Math.abs(args.amount || 0)} clicks...`;
     }
     if (tool === 'delete_file') {
       return `Verifying deletion for ${args.filePath || ''}...`;
@@ -254,9 +286,77 @@ export default function MessageBubble({ message, onSendMessage }) {
                     </div>
 
                     {isSuccess ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10B981', fontWeight: 500 }}>
-                        <CheckCircle2 size={14} />
-                        <span>✓ {result.message || `${toolName} executed successfully`}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10B981', fontWeight: 500 }}>
+                          <CheckCircle2 size={14} />
+                          <span>✓ {result.message || `${toolName} executed successfully`}</span>
+                        </div>
+                        {/* Parameter & Target Chips */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+                          {result.x !== undefined && result.y !== undefined && (
+                            <span style={{
+                              background: 'rgba(139, 92, 246, 0.2)',
+                              color: '#C4B5FD',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontFamily: 'monospace'
+                            }}>
+                              📍 ({result.x}, {result.y}){result.button ? ` [${result.button}]` : ''}
+                            </span>
+                          )}
+                          {tc.args?.text && (
+                            <span style={{
+                              background: 'rgba(59, 130, 246, 0.2)',
+                              color: '#93C5FD',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontFamily: 'monospace'
+                            }}>
+                              ⌨️ "{tc.args.text.length > 30 ? tc.args.text.slice(0, 30) + '...' : tc.args.text}"
+                            </span>
+                          )}
+                          {tc.args?.key && (
+                            <span style={{
+                              background: 'rgba(59, 130, 246, 0.2)',
+                              color: '#93C5FD',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontFamily: 'monospace'
+                            }}>
+                              ⌨️ [{tc.args.modifiers?.length ? tc.args.modifiers.join('+') + '+' : ''}{tc.args.key}]
+                            </span>
+                          )}
+                          {result.activeWindow && (
+                            <span style={{
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#6EE7B7',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '11px'
+                            }}>
+                              🪟 {result.activeWindow}
+                            </span>
+                          )}
+                        </div>
+                        {/* Observation / Screenshot Thumbnail */}
+                        {result.imageBase64 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <img
+                              src={`data:image/png;base64,${result.imageBase64}`}
+                              alt="Desktop capture preview"
+                              style={{
+                                maxWidth: '240px',
+                                maxHeight: '140px',
+                                borderRadius: '4px',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                objectFit: 'contain'
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     ) : isError ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#EF4444' }}>

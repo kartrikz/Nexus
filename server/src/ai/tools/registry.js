@@ -10,6 +10,14 @@ const { openApplicationTool } = require('./computer/openApplication');
 const { openUrlTool } = require('./computer/openUrl');
 const { openFileTool, openFolderTool } = require('./computer/openFileFolder');
 const { screenshotTool } = require('./computer/screenshot');
+const { desktopScreenshotTool } = require('./computer/desktopScreenshot');
+const { desktopObserveTool } = require('./computer/desktopObserve');
+const { mouseMoveTool } = require('./computer/mouseMove');
+const { mouseClickTool } = require('./computer/mouseClick');
+const { mouseDoubleClickTool } = require('./computer/mouseDoubleClick');
+const { keyboardTypeTool } = require('./computer/keyboardType');
+const { keyboardPressTool } = require('./computer/keyboardPress');
+const { scrollTool } = require('./computer/scroll');
 const { listAllowedApplicationsTool } = require('./computer/listApplications');
 const { deleteFileTool, moveFileTool, renameFileTool } = require('./computer/confirmationActions');
 const { checkToolPermission, PERMISSION_LEVEL } = require('./computer/computerPermissions');
@@ -27,12 +35,20 @@ class ToolRegistry {
     this.register(recallMemoryTool);
     this.register(fileReaderTool);
 
-    // Register computer control tools
+    // Register computer control tools (V1 & V2)
     this.register(openApplicationTool);
     this.register(openUrlTool);
     this.register(openFileTool);
     this.register(openFolderTool);
     this.register(screenshotTool);
+    this.register(desktopScreenshotTool);
+    this.register(desktopObserveTool);
+    this.register(mouseMoveTool);
+    this.register(mouseClickTool);
+    this.register(mouseDoubleClickTool);
+    this.register(keyboardTypeTool);
+    this.register(keyboardPressTool);
+    this.register(scrollTool);
     this.register(listAllowedApplicationsTool);
 
     // Register confirmation-required computer control tools

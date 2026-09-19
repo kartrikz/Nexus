@@ -31,7 +31,8 @@ const APPLICATION_ALLOWLIST = [
       path.join(PROGRAM_FILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
       path.join(PROGRAM_FILES_X86, 'Google', 'Chrome', 'Application', 'chrome.exe'),
       path.join(LOCAL_APPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')
-    ]
+    ],
+    defaultArgs: ['--new-window']
   },
   {
     name: 'Visual Studio Code',
@@ -102,7 +103,8 @@ const APPLICATION_ALLOWLIST = [
     candidates: [
       path.join(PROGRAM_FILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
       path.join(PROGRAM_FILES_X86, 'Microsoft', 'Edge', 'Application', 'msedge.exe')
-    ]
+    ],
+    defaultArgs: ['--new-window']
   }
 ];
 
@@ -136,18 +138,20 @@ function findApplication(query) {
  * Resolve the executable path for an application entry.
  * Checks candidate paths in order; returns the first that exists on disk.
  * @param {object} app - application entry from the allowlist
- * @returns {{ resolved: boolean, execPath?: string, uwpUri?: string, reason?: string }}
+ * @returns {{ resolved: boolean, execPath?: string, defaultArgs?: string[], uwpUri?: string, reason?: string }}
  */
 function resolveExecutablePath(app) {
   if (!app) {
     return { resolved: false, reason: 'Application not found in allowlist.' };
   }
 
+  const defaultArgs = app.defaultArgs || [];
+
   // Check each candidate path
   for (const candidate of app.candidates) {
     try {
       if (fs.existsSync(candidate)) {
-        return { resolved: true, execPath: candidate };
+        return { resolved: true, execPath: candidate, defaultArgs };
       }
     } catch {
       // Permission error or invalid path — skip
@@ -164,7 +168,7 @@ function resolveExecutablePath(app) {
     if (result) {
       const firstLine = result.split('\n')[0].trim();
       if (fs.existsSync(firstLine)) {
-        return { resolved: true, execPath: firstLine };
+        return { resolved: true, execPath: firstLine, defaultArgs };
       }
     }
   } catch {
