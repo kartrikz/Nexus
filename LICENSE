@@ -1,0 +1,179 @@
+NEXUSMIND SOURCE-AVAILABLE LICENSE v1.0 (NON-COMMERCIAL)
+
+Copyright (c) 2026 Sabari Karthik R. All rights reserved.
+
+NOTICE: This Software is provided under a source-available, non-commercial 
+license. It is NOT licensed under an Open Source Initiative (OSI) approved 
+license and does not constitute "Open Source" software as defined by the OSI. 
+Read this License carefully before accessing, downloading, building, modifying, 
+or using the Software.
+
+===============================================================================
+CORE SUMMARY (READ FIRST)
+===============================================================================
+
+You may download, copy, build, run, study, privately modify NexusMind, and 
+maintain private copies or private forks for personal, educational, academic, 
+or evaluation purposes without obtaining permission.
+
+Commercial use, commercial products or services, commercial SaaS/hosting/APIs, 
+redistribution, public forks, and the distribution of modified versions require 
+prior written permission from the Licensor.
+
+===============================================================================
+1. DEFINITIONS
+===============================================================================
+
+"Licensor" means Sabari Karthik R, the copyright holder and creator of NexusMind.
+
+"Software" means the original first-party source code, documentation, scripts, 
+build files, and assets comprising NexusMind, created by the Licensor, 
+specifically excluding Third-Party Components defined in Section 6.
+
+"Personal Use" means non-commercial, private, individual use by a person solely 
+for personal enrichment, hobbyist experimentation, or personal learning, with 
+no commercial purpose or revenue generation.
+
+"Educational Use" means non-commercial use by students, educators, or academic 
+institutions strictly for coursework, study, classroom instruction, or 
+non-commercial academic research.
+
+"Evaluation Use" means non-commercial running, testing, and assessment of the 
+Software solely to evaluate its features, architecture, or performance, with no 
+production, revenue-generating, or operational business deployment.
+
+"Commercial Use" means any activity, deployment, or execution of the Software, 
+in whole or in part, that:
+  (a) directly or indirectly generates revenue, income, or monetary gain;
+  (b) is used in or directly supports revenue-generating, production, or 
+      commercial business activities of any enterprise, company, or business;
+  (c) is bundled with or integrated into any paid product or commercial offering; 
+      or
+  (d) provides functionality to third parties via Software-as-a-Service (SaaS), 
+      hosted application, cloud platform, or network API.
+
+"Redistribution" means sharing, delivering, transmitting, mirroring, or making 
+copies of the Software (in source or binary form) available to any third party.
+
+"Public Fork" means creating, publishing, or maintaining a publicly accessible 
+copy, clone, repository, or mirror of the Software on any public hosting service 
+or website (including public repositories on GitHub, GitLab, or similar platforms).
+
+===============================================================================
+2. PERMITTED RIGHTS (NO PERMISSION REQUIRED)
+===============================================================================
+
+Subject to the terms of this License, the Licensor grants you a personal, 
+non-exclusive, non-transferable, non-sublicensable, royalty-free, revocable 
+license to:
+
+  (a) View, inspect, study, and clone the source code of the Software;
+  (b) Download, build, install, and execute an unmodified copy of the Software 
+      locally on your computing hardware solely for Personal Use, Educational 
+      Use, or Evaluation Use;
+  (c) Maintain private copies or private repository forks solely for your own 
+      Personal Use, Educational Use, or Evaluation Use, provided such copies or 
+      forks remain strictly private and are never made publicly accessible or 
+      redistributed to third parties; and
+  (d) Make private modifications to the Software strictly for your own Personal 
+      Use, Educational Use, or Evaluation Use, subject to Section 4.
+
+Permitted rights are determined by the NATURE OF THE ACTIVITY, not solely by 
+the identity or affiliation of the user. An individual associated with a 
+commercial company or enterprise may download, study, and privately test the 
+Software solely for non-commercial Evaluation Use under this Section without 
+prior permission.
+
+===============================================================================
+3. RESTRICTIONS (PRIOR WRITTEN PERMISSION REQUIRED)
+===============================================================================
+
+Except as expressly authorized in writing by the Licensor under an executed 
+separate agreement, you shall NOT, directly or indirectly:
+
+  (a) Use, execute, or integrate the Software for any Commercial Use;
+  (b) Sell, resell, rent, lease, sublicense, monetize, or charge fees for the 
+      Software or access thereto;
+  (c) Operate, deploy, or host the Software as a service, including as 
+      Software-as-a-Service (SaaS), Platform-as-a-Service (PaaS), hosted web 
+      application, network API, or managed cloud service for third parties;
+  (d) Engage in Redistribution of the Software, whether in original or modified 
+      form, in source code or compiled binary format;
+  (e) Create, publish, or host any Public Fork, publicly accessible clone, or 
+      public mirror of the Software;
+  (f) Distribute, transmit, share, or publish any modified version, fork, or 
+      derivative work of the Software to any third party;
+  (g) Create, distribute, or market commercial derivative works based upon or 
+      incorporating the Software; or
+  (h) Remove, obscure, alter, or conceal any copyright notices, attribution, 
+      or licensing text contained within the Software.
+
+===============================================================================
+4. PRIVATE MODIFICATIONS AND PRIVATE COPIES
+===============================================================================
+
+You may modify the Software privately and maintain private copies or private 
+repository forks solely on your own hardware or secure private accounts to the 
+extent necessary for your permitted Personal Use, Educational Use, or Evaluation 
+Use.
+
+However, your private copies, private forks, and privately modified versions:
+  (a) must NOT be publicly published, broadcast, or hosted;
+  (b) must NOT be placed into a Public Fork or publicly accessible repository;
+  (c) must NOT be redistributed or distributed to any third party; and
+  (d) must NOT be used for any Commercial Use.
+
+Any distribution or public sharing of modified versions or public forking 
+requires prior written permission from the Licensor.
+
+===============================================================================
+5. OWNERSHIP AND RESERVATION OF RIGHTS
+===============================================================================
+
+The Licensor retains all copyright, title, and ownership in and to the original 
+first-party Software. This License does not convey or transfer any ownership or 
+title to you. All rights not expressly granted in Section 2 are strictly and 
+exclusively reserved by the Licensor.
+
+===============================================================================
+6. THIRD-PARTY COMPONENTS
+===============================================================================
+
+The Software depends upon certain third-party software packages and libraries 
+(such as npm dependencies in node_modules).
+
+Each such Third-Party Component is governed solely and exclusively by its own 
+respective license (such as MIT, BSD-2-Clause, or ISC). Nothing in this License 
+limits, overrides, alters, or supersedes the rights granted to you under those 
+applicable third-party licenses, nor does the Licensor claim ownership of, or 
+attempt to relicense, any third-party code.
+
+===============================================================================
+7. TERMINATION
+===============================================================================
+
+This License and your rights to use the Software terminate automatically and 
+immediately upon any breach of its terms. Upon termination, you must cease all 
+use of the Software and delete all copies in your possession or control.
+
+===============================================================================
+8. COMMERCIAL LICENSING INQUIRIES
+===============================================================================
+
+For commercial licenses, enterprise deployment agreements, SaaS permissions, 
+or distribution authorization, contact:
+
+  Copyright Holder: Sabari Karthik R
+  Email: sabarikarthik37@gmail.com
+
+===============================================================================
+9. DISCLAIMER OF WARRANTIES AND LIMITATION OF LIABILITY
+===============================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS 
+FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE 
+LICENSOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, LOSS OF DATA, 
+REVENUE, OR PROFITS, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE 
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

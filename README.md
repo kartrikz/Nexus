@@ -265,4 +265,13 @@ nexusmind/
 
 ## 🛡️ License
 
-MIT License. Designed and crafted with original implementation for next-generation personal AI interaction.
+NexusMind is released under the **NexusMind Source-Available License v1.0 (Non-Commercial)**.
+
+### Quick Summary:
+- **Allowed without extra permission**: Viewing source, downloading, studying, local building/running, private local modifications, and maintaining private copies or private forks for personal, educational/academic, and non-commercial evaluation use.
+- **Requires prior written permission**: Commercial use, commercial products/services, commercial SaaS/hosting/APIs, redistribution, public forks (e.g., public GitHub/GitLab forks), and distributing modified versions.
+
+For commercial licensing, enterprise deployment, or redistribution arrangements, contact:  
+**Sabari Karthik R** — `sabarikarthik37@gmail.com`
+
+*Note: NexusMind is source-available software; it is not licensed under an OSI-approved open-source license. Third-party dependencies in `node_modules` remain governed by their respective licenses (MIT, BSD-2-Clause, ISC).*
